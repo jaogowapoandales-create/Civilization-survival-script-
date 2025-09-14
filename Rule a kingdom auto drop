@@ -1,0 +1,85 @@
+-- Load Wizard UI Library
+local Library = loadstring(Game:HttpGet("https://raw.githubusercontent.com/bloodball/-back-ups-for-libs/main/wizard"))()
+
+local Window = Library:NewWindow("Brainrot Farm GUI")
+local Tab = Window:NewSection("Main")
+
+local toggled = false
+local followLoop
+local swingLoop
+
+-- Config
+local FLOAT_HEIGHT = 4 -- Now floating 4 studs above the target
+
+Tab:CreateToggle("Float Above Brainrot & Swing Bat", function(value)
+    toggled = value
+    local Players = game:GetService("Players")
+    local lp = Players.LocalPlayer
+
+    local function equipBat()
+        local bat = lp.Backpack:FindFirstChild("Bat")
+        if bat then
+            bat.Parent = lp.Character
+        end
+    end
+
+    local function getBrainrotPlayer()
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= lp and player.Team and player.Team.Name == "Brainrot" then
+                local char = player.Character
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    return char
+                end
+            end
+        end
+        return nil
+    end
+
+    if toggled then
+        equipBat()
+
+        local hrp = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+        if not hrp then
+            warn("Your character is missing HumanoidRootPart")
+            return
+        end
+
+        followLoop = task.spawn(function()
+            while toggled do
+                local target = getBrainrotPlayer()
+                if target and target:FindFirstChild("HumanoidRootPart") then
+                    local targetHRP = target.HumanoidRootPart
+                    local floatCFrame = targetHRP.CFrame * CFrame.new(0, FLOAT_HEIGHT, 0)
+                    hrp.CFrame = floatCFrame
+                end
+                task.wait(0.1)
+            end
+        end)
+
+        swingLoop = task.spawn(function()
+            while toggled do
+                local char = lp.Character
+                if char then
+                    local bat = char:FindFirstChild("Bat")
+                    if bat then
+                        local swingEvent = bat:FindFirstChild("SwingEvent")
+                        if swingEvent then
+                            local target = getBrainrotPlayer()
+                            if target and target:FindFirstChild("HumanoidRootPart") then
+                                local dir = (target.HumanoidRootPart.Position - bat.Position).Unit
+                                swingEvent:FireServer(dir)
+                            end
+                        end
+                    else
+                        equipBat()
+                    end
+                end
+                task.wait(0.2)
+            end
+        end)
+
+    else
+        if followLoop then task.cancel(followLoop) end
+        if swingLoop then task.cancel(swingLoop) end
+    end
+end)
