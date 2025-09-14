@@ -1,0 +1,232 @@
+-- Services
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+-- Load Wizard UI
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/bloodball/-back-ups-for-libs/main/wizard"))()
+
+-- Create your window with Wizard UI
+local Window = Library:NewWindow("steal a brainrot")
+
+-- Move Wizard UI GUI from CoreGui (if exists) to PlayerGui to avoid detection
+task.defer(function()
+    local CoreGui = game:GetService("CoreGui")
+    for _, gui in pairs(CoreGui:GetChildren()) do
+        if gui.Name == "WizardUI" or gui.Name:lower():find("wizard") then
+            gui.Parent = PlayerGui
+            gui.Name = "SafeUI_" .. tostring(math.random(1000,9999))
+            print("[Stealth] Moved and renamed Wizard UI to PlayerGui as "..gui.Name)
+        end
+    end
+end)
+
+-- Create tab
+local Tab = Window:NewSection("bypass")
+
+-- === STEALTH SPEED BYPASS (FAST VERSION) ===
+local speedBypassConnection
+local totalSpeed = 8 -- Higher = faster, but riskier. Try 6–10
+local steps = 4      -- Number of tiny steps to split movement into
+
+Tab:CreateToggle("Stealth Speed Bypass (Fast)", function(enabled)
+    if enabled then
+        speedBypassConnection = RunService.RenderStepped:Connect(function()
+            local character = LocalPlayer.Character
+            if not character then return end
+
+            local hrp = character:FindFirstChild("HumanoidRootPart")
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if not hrp or not humanoid or humanoid.Sit or humanoid.Health <= 0 then return end
+
+            local moveDirection = humanoid.MoveDirection
+            if moveDirection.Magnitude > 0 then
+                local stepSize = totalSpeed / steps
+                for _ = 1, steps do
+                    hrp.CFrame = hrp.CFrame + (moveDirection * stepSize)
+                    task.wait() -- Wait to simulate smoother movement
+                end
+            end
+        end)
+        print("[Stealth Speed] Fast mode enabled")
+    else
+        if speedBypassConnection then
+            speedBypassConnection:Disconnect()
+            speedBypassConnection = nil
+        end
+        print("[Stealth Speed] Disabled")
+    end
+end)
+
+-- === TELEPORT (TP) BYPASS ===
+local tpBypassConnection
+local lastSafeCFrame = nil
+
+Tab:CreateToggle("Teleport Bypass", function(enabled)
+    if enabled then
+        -- Save last safe position continuously
+        tpBypassConnection = RunService.Heartbeat:Connect(function()
+            local character = LocalPlayer.Character
+            if not character then return end
+
+            local hrp = character:FindFirstChild("HumanoidRootPart")
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if hrp and humanoid and humanoid.Health > 0 then
+                lastSafeCFrame = hrp.CFrame
+            end
+        end)
+
+        -- Prevent position resets by constantly resetting HRP to last safe position if detected
+        RunService.Heartbeat:Connect(function()
+            local character = LocalPlayer.Character
+            if not character or not lastSafeCFrame then return end
+
+            local hrp = character:FindFirstChild("HumanoidRootPart")
+            if hrp and (hrp.CFrame.Position - lastSafeCFrame.Position).Magnitude > 10 then
+                -- Server tried to teleport back, reset position to lastSafeCFrame
+                hrp.CFrame = lastSafeCFrame
+                print("[TP Bypass] Blocked server teleport/reset")
+            end
+        end)
+
+        print("[TP Bypass] Enabled")
+    else
+        if tpBypassConnection then
+            tpBypassConnection:Disconnect()
+            tpBypassConnection = nil
+        end
+        print("[TP Bypass] Disabled")
+    end
+end)
+
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
+local INTERACT_RADIUS = 10
+local SCAN_INTERVAL = 0.5
+local autoInteractEnabled = false  -- Controlled by toggle
+
+-- Function to find and trigger nearby ProximityPrompts
+local function findNearbyPrompts()
+    for _, prompt in pairs(workspace:GetDescendants()) do
+        if prompt:IsA("ProximityPrompt") and prompt.Enabled then
+            local part = prompt.Parent:IsA("BasePart") and prompt.Parent or nil
+            if part then
+                local distance = (part.Position - humanoidRootPart.Position).Magnitude
+                if distance <= INTERACT_RADIUS then
+                    pcall(function()
+                        prompt:InputHoldBegin()
+                        task.wait(0.1)
+                        prompt:InputHoldEnd()
+                    end)
+                end
+            end
+        end
+    end
+end
+
+-- Loop that runs only when toggle is ON
+task.spawn(function()
+    while true do
+        if autoInteractEnabled then
+            findNearbyPrompts()
+        end
+        task.wait(SCAN_INTERVAL)
+    end
+end)
+
+-- Hook up your UI toggle (example with a UI library tab)
+Tab:CreateToggle("Auto Interact", function(value)
+    autoInteractEnabled = value
+    print("Auto Interact is now:", value)
+end)
+
+-- === KICK + BAN + TP REMOTE BLOCKING ===
+local remoteConnections = {}
+
+local function blockRemotes(enable)
+    if not enable then
+        for _, conn in pairs(remoteConnections) do
+            conn:Disconnect()
+        end
+        remoteConnections = {}
+        return
+    end
+
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj:IsA("RemoteEvent") then
+            local conn = obj.OnClientEvent:Connect(function(...)
+                local args = {...}
+                if #args > 0 and typeof(args[1]) == "string" then
+                    local msg = args[1]:lower()
+                    if msg:find("kick") or msg:find("ban") or msg:find("teleport") or msg:find("tp") then
+                        warn("[Adonis Bypass] Blocked suspicious remote message:", msg)
+                        return
+                    end
+                end
+            end)
+            table.insert(remoteConnections, conn)
+        elseif obj:IsA("RemoteFunction") then
+            local oldInvoke = obj.InvokeServer
+            obj.InvokeServer = function(self, ...)
+                local args = {...}
+                for _, v in ipairs(args) do
+                    if typeof(v) == "string" then
+                        local lower = v:lower()
+                        if lower:find("kick") or lower:find("ban") or lower:find("teleport") or lower:find("tp") then
+                            warn("[Adonis Bypass] Blocked suspicious remote function call")
+                            return nil
+                        end
+                    end
+                end
+                return oldInvoke(self, ...)
+            end
+        end
+    end
+end
+
+Tab:CreateToggle("Kick + Ban + TP Remote Block", function(enabled)
+    if enabled then
+        blockRemotes(true)
+        print("[Remote Block] Enabled")
+    else
+        blockRemotes(false)
+        print("[Remote Block] Disabled")
+    end
+end, true) -- Default ON
+
+-- === ADONIS & ANTI-KICK BYPASSES ===
+
+-- Remove Adonis LocalScripts from Player
+for _, v in pairs(LocalPlayer:GetChildren()) do
+    if v:IsA("LocalScript") and v.Name:lower():find("adonis") then
+        v:Destroy()
+        warn("[Adonis Bypass] Removed Adonis LocalScript:", v.Name)
+    end
+end
+
+-- Override Player:Kick without hooking __namecall
+do
+    local mt = getmetatable(LocalPlayer)
+    if mt and mt.__index then
+        local oldKick = mt.__index.Kick
+        mt.__index.Kick = function(self, ...)
+            if self == LocalPlayer then
+                warn("[Anti-Kick] Blocked direct Kick call on LocalPlayer")
+                return
+            end
+            return oldKick(self, ...)
+        end
+    else
+        LocalPlayer.Kick = function()
+            warn("[Anti-Kick] Blocked direct Kick call (fallback)")
+        end
+    end
+end
