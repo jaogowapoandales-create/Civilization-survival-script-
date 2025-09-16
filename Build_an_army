@@ -1,0 +1,184 @@
+------------------------------------------------------------
+-- Wizard UI: Auto Buy + Auto Place Units + Tutorial
+-- Uses Window:NewSection API (site style)
+------------------------------------------------------------
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterGui = game:GetService("StarterGui")
+
+-- load Wizard UI lib
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/bloodball/-back-ups-for-libs/main/wizard"))()
+
+-- create window + section
+local Window = Library:NewWindow("x")
+local Section = Window:NewSection("Units")
+
+------------------------------------------------------------
+-- Unit List (added "B2 Bomber")
+------------------------------------------------------------
+local unitList = {
+    "Infantry",
+    "Machine Gunner",
+    "Rocketeer",
+    "Humvee",
+    "Special Force",
+    "Tank",
+    "APC",
+    "Sniper",
+    "Heavy Tank",
+    "Medic",
+    "Drone",
+    "Artillery",
+    "Rocket Artillery",
+    "Helicopter",
+    "Jet",
+    "B2 Bomber"             -- <- ADDED
+}
+
+local selectedUnit = "Infantry"
+local AutoBuy = false
+local AutoPlace = false
+
+------------------------------------------------------------
+-- Placement Box Coords (4 corners)
+------------------------------------------------------------
+local placeBox = {
+    Vector3.new(611.9725341796875, 251.97625732421875, -916.909423828125),
+    Vector3.new(611.8016967773438, 251.97625732421875, -950.6447143554688),
+    Vector3.new(669.932373046875, 251.97625732421875, -950.6466674804688),
+    Vector3.new(669.6620483398438, 251.9762725830078, -917.3921508789062)
+}
+
+local function getRandomPointInBox()
+    local xMin = math.min(placeBox[1].X, placeBox[2].X, placeBox[3].X, placeBox[4].X)
+    local xMax = math.max(placeBox[1].X, placeBox[2].X, placeBox[3].X, placeBox[4].X)
+    local zMin = math.min(placeBox[1].Z, placeBox[2].Z, placeBox[3].Z, placeBox[4].Z)
+    local zMax = math.max(placeBox[1].Z, placeBox[2].Z, placeBox[3].Z, placeBox[4].Z)
+    local x = math.random() * (xMax - xMin) + xMin
+    local z = math.random() * (zMax - zMin) + zMin
+    local y = placeBox[1].Y
+    return CFrame.new(x, y, z)
+end
+
+------------------------------------------------------------
+-- UI controls
+------------------------------------------------------------
+-- 1) Dropdown: select unit
+Section:CreateDropdown("Select Unit", unitList, 1, function(choice)
+    selectedUnit = choice
+    StarterGui:SetCore("SendNotification", {
+        Title = "Unit Selected",
+        Text = "Chosen: " .. tostring(choice),
+        Duration = 2
+    })
+end)
+
+-- 2) Auto Buy toggle
+Section:CreateToggle("Auto Buy Selected Unit", function(state)
+    AutoBuy = state
+    if state then
+        task.spawn(function()
+            while AutoBuy do
+                local ok, buyEvent = pcall(function()
+                    return ReplicatedStorage:WaitForChild("Events"):WaitForChild("BuyItem")
+                end)
+                if ok and buyEvent and selectedUnit then
+                    pcall(function()
+                        buyEvent:FireServer(selectedUnit)
+                    end)
+                end
+                task.wait(1)
+            end
+        end)
+    end
+end)
+
+-- 3) Auto Place toggle (random inside box)
+Section:CreateToggle("Auto Place Selected Unit", function(state)
+    AutoPlace = state
+    if state then
+        task.spawn(function()
+            while AutoPlace do
+                local ok, placeEvent = pcall(function()
+                    return ReplicatedStorage:WaitForChild("Events"):WaitForChild("TryPlace")
+                end)
+                if ok and placeEvent and selectedUnit then
+                    pcall(function()
+                        local args = {
+                            selectedUnit,
+                            getRandomPointInBox(),
+                            selectedUnit
+                        }
+                        placeEvent:InvokeServer(unpack(args))
+                    end)
+                end
+                task.wait(0.01)
+            end
+        end)
+    end
+end)
+
+------------------------------------------------------------
+-- Delete All Units in Box
+------------------------------------------------------------
+local boxCorners = {
+    Vector3.new(611.9725, 251.9762, -916.9094),
+    Vector3.new(611.8017, 251.9762, -950.6447),
+    Vector3.new(669.9323, 251.9762, -950.6466),
+    Vector3.new(669.6620, 251.9762, -917.3921)
+}
+
+-- Calculate bounding box (min/max for XYZ)
+local minX, maxX = math.huge, -math.huge
+local minY, maxY = math.huge, -math.huge
+local minZ, maxZ = math.huge, -math.huge
+
+for _, v in ipairs(boxCorners) do
+    minX, maxX = math.min(minX, v.X), math.max(maxX, v.X)
+    minY, maxY = math.min(minY, v.Y), math.max(maxY, v.Y)
+    minZ, maxZ = math.min(minZ, v.Z), math.max(maxZ, v.Z)
+end
+
+local function insideBox(pos)
+    return pos.X >= minX and pos.X <= maxX
+       and pos.Y >= minY and pos.Y <= maxY
+       and pos.Z >= minZ and pos.Z <= maxZ
+end
+
+Section:CreateButton("Delete All Units in Box", function()
+    local deleteEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("TryDelete")
+    
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("Model") and obj:FindFirstChild("HumanoidRootPart") then
+            local hrp = obj.HumanoidRootPart
+            if insideBox(hrp.Position) then
+                local args = { obj }
+                pcall(function()
+                    deleteEvent:InvokeServer(unpack(args))
+                end)
+            end
+        end
+    end
+    
+    StarterGui:SetCore("SendNotification", {
+        Title = "Delete",
+        Text = "All units inside box removed.",
+        Duration = 3
+    })
+end)
+
+
+-- 4) Tutorial complete button
+Section:CreateButton("Auto Complete Tutorial", function()
+    local ok, tutorialEvent = pcall(function()
+        return ReplicatedStorage:WaitForChild("Events"):WaitForChild("Tutorial")
+    end)
+    if ok and tutorialEvent then
+        pcall(function() tutorialEvent:FireServer() end)
+        StarterGui:SetCore("SendNotification", {Title="Tutorial", Text="Completed", Duration=2})
+    else
+        StarterGui:SetCore("SendNotification", {Title="Error", Text="Tutorial event not found", Duration=3})
+    end
+end)
+
+StarterGui:SetCore("SendNotification", {Title="Units UI", Text="Loaded", Duration=2})
+
