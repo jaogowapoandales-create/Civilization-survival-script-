@@ -1,0 +1,404 @@
+------------------------------------------------------------
+-- Wizard UI: Combat Hub (with Switch Team Button)
+------------------------------------------------------------
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterGui = game:GetService("StarterGui")
+local Teams = game:GetService("Teams")
+local RunService = game:GetService("RunService")
+
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+-- =========================
+-- ScreenGui
+-- =========================
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "WizardUILoading"
+screenGui.Parent = PlayerGui
+
+-- =========================
+-- Loading Tips
+-- =========================
+local tipsFrame = Instance.new("Frame")
+tipsFrame.Size = UDim2.new(0, 300, 0, 40)
+tipsFrame.Position = UDim2.new(0.5, -150, 0.5, -70)
+tipsFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+tipsFrame.BorderSizePixel = 0
+tipsFrame.Parent = screenGui
+
+local tipsLabel = Instance.new("TextLabel")
+tipsLabel.Size = UDim2.new(1, 0, 1, 0)
+tipsLabel.BackgroundTransparency = 1
+tipsLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+tipsLabel.TextScaled = true
+tipsLabel.Font = Enum.Font.SourceSansBold
+tipsLabel.Text = "Tip: Loading..."
+tipsLabel.Parent = tipsFrame
+
+local tips = {
+    "Tip: You can move the GUI around.",
+    "Tip: Check your inventory before starting.",
+    "Tip: Press F to open the wizard menu.",
+    "Tip: Auto-equip tools for faster gameplay.",
+    "Tip: Subscribe to ScriptsIsWter for updates!"
+}
+
+spawn(function()
+    local i = 1
+    while screenGui.Parent do
+        tipsLabel.Text = tips[i]
+        i = i + 1
+        if i > #tips then i = 1 end
+        wait(2.5)
+    end
+end)
+
+-- =========================
+-- Loading Bar
+-- =========================
+local bg = Instance.new("Frame")
+bg.Size = UDim2.new(0, 300, 0, 50)
+bg.Position = UDim2.new(0.5, -150, 0.5, -25)
+bg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+bg.BorderSizePixel = 0
+bg.Parent = screenGui
+
+local bar = Instance.new("Frame")
+bar.Size = UDim2.new(0, 0, 1, 0)
+bar.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+bar.BorderSizePixel = 0
+bar.Parent = bg
+
+local label = Instance.new("TextLabel")
+label.Size = UDim2.new(1, 0, 1, 0)
+label.BackgroundTransparency = 1
+label.TextColor3 = Color3.fromRGB(255, 255, 255)
+label.TextScaled = true
+label.Font = Enum.Font.SourceSansBold
+label.Text = "Loading 0%"
+label.Parent = bg
+
+-- =========================
+-- Subscribe Bar
+-- =========================
+local subBar = Instance.new("Frame")
+subBar.Size = UDim2.new(1, 0, 0, 30)
+subBar.Position = UDim2.new(0, 0, 1, -30)
+subBar.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+subBar.BorderSizePixel = 0
+subBar.Parent = screenGui
+
+local subLabel = Instance.new("TextLabel")
+subLabel.Size = UDim2.new(1, 0, 1, 0)
+subLabel.BackgroundTransparency = 1
+subLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+subLabel.TextScaled = true
+subLabel.Font = Enum.Font.SourceSansBold
+subLabel.Text = "Subscribe to ScriptsIsWter"
+subLabel.Parent = subBar
+
+-- Sound for subscribe bar
+local sound = Instance.new("Sound")
+sound.SoundId = "rbxassetid://9118823046" -- example sound
+sound.Volume = 1
+sound.Parent = subBar
+sound:Play()
+
+-- Animate subscribe bar (pulse)
+local t = 0
+RunService.RenderStepped:Connect(function(deltaTime)
+    t = t + deltaTime
+    local pulse = (math.sin(t*2) + 1)/2 * 0.3 + 0.7
+    subBar.BackgroundColor3 = Color3.fromRGB(20, 20, 20):Lerp(Color3.fromRGB(50, 50, 50), pulse)
+end)
+
+-- =========================
+-- Simulate Loading
+-- =========================
+for i = 1, 100 do
+    bar.Size = UDim2.new(i/100, 0, 1, 0)
+    label.Text = "Loading " .. i .. "%"
+    wait(0.02)
+end
+
+-- Load Wizard UI safely
+local success, Library = pcall(function()
+    return loadstring(game:HttpGet("https://raw.githubusercontent.com/bloodball/-back-ups-for-libs/main/wizard"))()
+end)
+
+-- Update loading bar after load
+if success and Library then
+    label.Text = "Loaded Successfully ✅"
+    bar.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
+else
+    label.Text = "Failed to Load ❌"
+    bar.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+end
+
+-- Remove loading bar and tips after 2 seconds
+wait(2)
+bg:Destroy()
+bar:Destroy()
+label:Destroy()
+tipsFrame:Destroy()
+-- Subscribe bar remains
+
+-- =========================
+-- Create Window + Sections
+-- =========================
+local Window = Library:NewWindow("My Hub")
+local Section = Window:NewSection("Combat")
+local SectionEtc = Window:NewSection("etc...")
+
+------------------------------------------------------------
+-- Enemy List Function
+------------------------------------------------------------
+local selectedPlayer = nil
+local enemyList = {}
+
+local function UpdateEnemyList()
+    enemyList = {}
+    local myTeam = LocalPlayer.Team
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Team and myTeam and plr.Team ~= myTeam then
+            table.insert(enemyList, plr.Name)
+        end
+    end
+    if #enemyList == 0 then
+        table.insert(enemyList, "No Enemies")
+    end
+    return enemyList
+end
+
+-- Dropdown for enemies
+Section:CreateDropdown("Select Enemy", UpdateEnemyList(), 1, function(choice)
+    if choice ~= "No Enemies" then
+        selectedPlayer = choice
+    else
+        selectedPlayer = nil
+    end
+end)
+
+Players.PlayerAdded:Connect(UpdateEnemyList)
+Players.PlayerRemoving:Connect(UpdateEnemyList)
+LocalPlayer:GetPropertyChangedSignal("Team"):Connect(UpdateEnemyList)
+
+------------------------------------------------------------
+-- Helper: Equip sword safely
+------------------------------------------------------------
+local function EquipSword()
+    for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
+        if tool:IsA("Tool") and tool.Name:lower():find("sword") then
+            tool.Parent = LocalPlayer.Character
+            return tool
+        end
+    end
+    return LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+end
+
+------------------------------------------------------------
+-- Auto TP + Sword + Tap Toggle
+------------------------------------------------------------
+local AutoTP = false
+Section:CreateToggle("Auto TP + Sword + Tap", function(state)
+    AutoTP = state
+    if state then
+        task.spawn(function()
+            while AutoTP do
+                if selectedPlayer then
+                    local target = Players:FindFirstChild(selectedPlayer)
+                    local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    if target and target.Team ~= LocalPlayer.Team and target.Character and target.Character:FindFirstChild("HumanoidRootPart") and myHRP then
+                        
+                        -- TP behind target
+                        local tHRP = target.Character.HumanoidRootPart
+                        myHRP.CFrame = tHRP.CFrame * CFrame.new(0, 0, 3)
+
+                        -- Equip sword
+                        local tool = EquipSword()
+                        if tool then
+                            pcall(function()
+                                tool:Activate()
+                            end)
+                        end
+                    end
+                end
+                task.wait(0.25)
+            end
+        end)
+    end
+end)
+
+------------------------------------------------------------
+-- Auto Kill All Enemies Toggle
+------------------------------------------------------------
+local AutoKill = false
+Section:CreateToggle("Auto Kill Enemies", function(state)
+    AutoKill = state
+    if state then
+        local enemyTeam = LocalPlayer.Team and LocalPlayer.Team.Name == "Red" and "Blue" or "Red"
+        StarterGui:SetCore("SendNotification", {
+            Title = "Auto Kill",
+            Text = "Now auto-killing all " .. enemyTeam .. " players!",
+            Duration = 3
+        })
+        task.spawn(function()
+            while AutoKill do
+                local myTeam = LocalPlayer.Team
+                local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if myTeam and myHRP then
+                    for _, plr in ipairs(Players:GetPlayers()) do
+                        if plr ~= LocalPlayer and plr.Team and myTeam and plr.Team ~= myTeam and plr.Character then
+                            local tHRP = plr.Character:FindFirstChild("HumanoidRootPart")
+                            local hum = plr.Character:FindFirstChildOfClass("Humanoid")
+                            if tHRP and hum and hum.Health > 0 then
+                                -- TP behind enemy
+                                myHRP.CFrame = tHRP.CFrame * CFrame.new(0, 0, 3)
+                                -- Equip sword + attack
+                                local tool = EquipSword()
+                                if tool then
+                                    pcall(function()
+                                        tool:Activate()
+                                    end)
+                                end
+                            end
+                        end
+                    end
+                end
+                task.wait(0.25)
+            end
+        end)
+    end
+end)
+
+------------------------------------------------------------
+-- Switch Team Button
+------------------------------------------------------------
+Section:CreateButton("Switch Team", function()
+    local myTeam = LocalPlayer.Team
+    if Teams:FindFirstChild("Red") and Teams:FindFirstChild("Blue") then
+        if myTeam and myTeam.Name == "Red" then
+            LocalPlayer.Team = Teams.Blue
+            StarterGui:SetCore("SendNotification", {
+                Title = "Team Switch",
+                Text = "You are now on Blue Team!",
+                Duration = 3
+            })
+        else
+            LocalPlayer.Team = Teams.Red
+            StarterGui:SetCore("SendNotification", {
+                Title = "Team Switch",
+                Text = "You are now on Red Team!",
+                Duration = 3
+            })
+        end
+    else
+        StarterGui:SetCore("SendNotification", {
+            Title = "Error",
+            Text = "Red/Blue teams not found in this game!",
+            Duration = 3
+        })
+    end
+end)
+
+------------------------------------------------------------
+-- Aimbot Toggle
+------------------------------------------------------------
+local AimbotOn = false
+local aimbotConnection = nil
+local lastFire = 0
+
+local function fireAtEnemy()
+    local myTeam = LocalPlayer.Team
+    local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not myHRP then return end
+
+    local closest, dist = nil, math.huge
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Team ~= myTeam and plr.Character then
+            local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local d = (myHRP.Position - hrp.Position).Magnitude
+                if d < dist then
+                    dist, closest = d, plr
+                end
+            end
+        end
+    end
+
+    if closest then
+        local pistol = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Pistol")
+        local fireRemote = pistol and pistol:FindFirstChild("FireNow")
+        local targetHRP = closest.Character and closest.Character:FindFirstChild("HumanoidRootPart")
+        if fireRemote and targetHRP and tick() - lastFire > 0.1 then
+            lastFire = tick()
+            pcall(function()
+                fireRemote:FireServer({
+                    {workspace.Baseplate or workspace, myHRP.Position, targetHRP.Position},
+                    "passoke"
+                })
+            end)
+        end
+    end
+end
+
+SectionEtc:CreateToggle("Enable Aimbot", function(state)
+    AimbotOn = state
+    if state then
+        aimbotConnection = RunService.RenderStepped:Connect(function()
+            if AimbotOn then
+                fireAtEnemy()
+            end
+        end)
+    else
+        if aimbotConnection then
+            aimbotConnection:Disconnect()
+            aimbotConnection = nil
+        end
+    end
+end)
+
+------------------------------------------------------------
+-- Debug Script Button
+------------------------------------------------------------
+SectionEtc:CreateButton("Debug Script", function()
+    StarterGui:SetCore("SendNotification", {
+        Title = "Debug",
+        Text = "Checking script output…",
+        Duration = 3
+    })
+
+    print("===== DEBUG START =====")
+    print("LocalPlayer:", LocalPlayer.Name)
+    print("Team:", LocalPlayer.Team and LocalPlayer.Team.Name or "No Team")
+
+    local events = {"BuyItem", "TryPlace", "Tutorial", "MoveUnits", "DamageEvent", "BanEvent"}
+    for _, ev in ipairs(events) do
+        local ok = ReplicatedStorage:FindFirstChild("Events") and ReplicatedStorage.Events:FindFirstChild(ev)
+        print(ev .. ":", ok and "✅ Found" or "❌ Missing")
+    end
+
+    local sword = EquipSword()
+    print("Sword equipped:", sword and sword.Name or "❌ No Sword")
+    print("===== DEBUG END =====")
+end)
+
+------------------------------------------------------------
+-- Destroy GUI Button (force removes Wizard UI)
+------------------------------------------------------------
+SectionEtc:CreateButton("Destroy GUI", function()
+    StarterGui:SetCore("SendNotification", {
+        Title = "Wizard UI",
+        Text = "GUI Destroyed",
+        Duration = 3
+    })
+
+    for _, gui in ipairs(game.CoreGui:GetChildren()) do
+        if gui:IsA("ScreenGui") and gui:FindFirstChildOfClass("Frame") then
+            if gui.Name:lower():find("wizard") or gui.Name:lower():find("ui") then
+                gui:Destroy()
+            end
+        end
+    end
+end)
