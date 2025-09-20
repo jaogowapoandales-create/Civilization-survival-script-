@@ -1,0 +1,123 @@
+-- Load Rayfield
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "Give Cash GUI",
+    LoadingTitle = "Loading Give Cash",
+    LoadingSubtitle = "by scriptsiswter",
+    ShowText = "Give Cash",
+    Theme = "Default",
+    ToggleUIKeybind = "K"
+})
+
+local Tab = Window:CreateTab("Cash & Speed", 4483362458)
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local VfxEvents = ReplicatedStorage:WaitForChild("RemoteEvents"):WaitForChild("VfxEvents"):WaitForChild("GiveCash")
+
+-- Variables
+local typedValue = 0
+local autoSend = false
+local speedValue = 16
+local speedEnabled = false
+
+-- Cash Amount Input
+local CashInput = Tab:CreateInput({
+    Name = "Cash Amount",
+    CurrentValue = "0",
+    PlaceholderText = "Type amount here (can be negative)",
+    RemoveTextAfterFocusLost = false,
+    Flag = "CashInput",
+    Callback = function(Text)
+        local value = tonumber(Text)
+        typedValue = value or 0
+    end,
+})
+
+-- Give Cash Once Button
+Tab:CreateButton({
+    Name = "Give Cash Once",
+    Callback = function()
+        VfxEvents:FireServer(typedValue)
+    end,
+})
+
+-- Auto Give Cash Toggle
+Tab:CreateToggle({
+    Name = "Auto Give Cash (lag)",
+    CurrentValue = false,
+    Flag = "AutoCashToggle",
+    Callback = function(State)
+        autoSend = State
+        if autoSend then
+            spawn(function()
+                while autoSend do
+                    VfxEvents:FireServer(typedValue)
+                    task.wait(0.1) -- send every 0.1 sec
+                end
+            end)
+        end
+    end,
+})
+
+-- Walk Speed Slider
+Tab:CreateSlider({
+    Name = "Walk Speed",
+    Range = {16, 500},
+    Increment = 1,
+    Suffix = "Speed",
+    CurrentValue = 16,
+    Flag = "SpeedSlider",
+    Callback = function(Value)
+        speedValue = Value
+        if speedEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            LocalPlayer.Character.Humanoid.WalkSpeed = speedValue
+        end
+    end,
+})
+
+-- Walk Speed Toggle
+Tab:CreateToggle({
+    Name = "Enable Speed",
+    CurrentValue = false,
+    Flag = "SpeedToggle",
+    Callback = function(State)
+        speedEnabled = State
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            LocalPlayer.Character.Humanoid.WalkSpeed = State and speedValue or 16
+        end
+    end,
+})
+
+-- Auto apply speed on respawn
+LocalPlayer.CharacterAdded:Connect(function(char)
+    local humanoid = char:WaitForChild("Humanoid")
+    if speedEnabled then
+        humanoid.WalkSpeed = speedValue
+    end
+end)
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local releaseDelay = 1 -- seconds between releases
+
+-- Auto-release loop tied directly to toggle
+Tab:CreateToggle({
+    Name = "Auto Release Bee",
+    CurrentValue = false,
+    Flag = "AutoReleaseToggle",
+    Callback = function(State)
+        spawn(function()
+            while State do
+                local remote = ReplicatedStorage:WaitForChild("RemoteEvents")
+                                :WaitForChild("CrateEvents")
+                                :WaitForChild("ReleasePet")
+                if remote then
+                    remote:FireServer("Bee")
+                end
+                task.wait(releaseDelay)
+            end
+        end)
+    end
+})
