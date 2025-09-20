@@ -1,0 +1,344 @@
+-- Load Rayfield
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "Full Role ESP",
+    LoadingTitle = "Loading...",
+    LoadingSubtitle = "by scriptsiswter",
+    ShowText = "open ui",
+    Theme = "Default",
+    ToggleUIKeybind = "K",
+    ConfigurationSaving = { Enabled = true, FolderName = nil, FileName = "FullRoleESPConfig" }
+})
+
+local Tab = Window:CreateTab("ESP", 4483362458)
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- Variables
+local ESPEnabled = false
+local highlights = {}
+
+-- Default color mapping for known roles
+local roleColors = {
+    ["Doctor"] = Color3.fromRGB(0, 255, 0),
+    ["Mafia"] = Color3.fromRGB(255, 0, 0),
+    ["Civilian"] = Color3.fromRGB(255, 255, 255),
+    ["Detective"] = Color3.fromRGB(0, 0, 255),
+    ["Jester"] = Color3.fromRGB(255, 165, 0),
+    -- Add more roles here if needed
+}
+
+-- Function to assign color dynamically for unknown roles
+local function getRoleColor(role)
+    if roleColors[role] then
+        return roleColors[role]
+    else
+        -- Assign random color for unknown roles
+        local color = Color3.fromHSV(math.random(), 1, 1)
+        roleColors[role] = color
+        return color
+    end
+end
+
+-- Function to create role display
+local function displayRole(player)
+    if not player.Character or not player.Character:FindFirstChild("Head") then return end
+
+    -- Remove previous
+    if highlights[player] then
+        highlights[player].Billboard:Destroy()
+        highlights[player] = nil
+    end
+
+    local role = player:GetAttribute("Role") or "Unknown"
+
+    -- BillboardGui
+    local billboard = Instance.new("BillboardGui")
+    billboard.Adornee = player.Character.Head
+    billboard.Size = UDim2.new(0, 120, 0, 40)
+    billboard.StudsOffset = Vector3.new(0, 3, 0)
+    billboard.AlwaysOnTop = true
+
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Parent = billboard
+    textLabel.Size = UDim2.new(1,0,1,0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.TextScaled = true
+    textLabel.Text = role
+    textLabel.TextColor3 = getRoleColor(role)
+
+    billboard.Parent = player.Character.Head
+    highlights[player] = {Billboard = billboard}
+end
+
+-- Toggle ESP
+Tab:CreateToggle({
+    Name = "Enable Role ESP",
+    CurrentValue = false,
+    Flag = "ESP",
+    Callback = function(state)
+        ESPEnabled = state
+        if ESPEnabled then
+            for _, player in pairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer then
+                    displayRole(player)
+                    player.CharacterAdded:Connect(function()
+                        task.wait(1)
+                        displayRole(player)
+                    end)
+                end
+            end
+        else
+            for _, v in pairs(highlights) do
+                v.Billboard:Destroy()
+            end
+            highlights = {}
+        end
+    end
+})
+
+-- Track new players
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function()
+        if ESPEnabled then
+            task.wait(1)
+            displayRole(player)
+        end
+    end)
+end)
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = Players.LocalPlayer
+
+-- Table to hold player names for dropdown
+local playerNames = {}
+for _, player in pairs(Players:GetPlayers()) do
+    table.insert(playerNames, player.Name)
+end
+
+-- Variables
+local selectedPlayer = nil
+local autoKillEnabled = false
+
+-- Dropdown to select a player
+local PlayerDropdown = Tab:CreateDropdown({
+    Name = "Select Player",
+    Options = playerNames,
+    Flag = "PlayerDropdown",
+    Callback = function(choice)
+        selectedPlayer = choice
+    end
+})
+
+-- Update dropdown if new player joins
+Players.PlayerAdded:Connect(function(player)
+    table.insert(playerNames, player.Name)
+    PlayerDropdown:UpdateOptions(playerNames)
+end)
+
+-- Auto Kill toggle
+Tab:CreateToggle({
+    Name = "Auto Kill",
+    CurrentValue = false,
+    Flag = "AutoKillToggle",
+    Callback = function(state)
+        autoKillEnabled = state
+        if autoKillEnabled and selectedPlayer then
+            spawn(function()
+                while autoKillEnabled do
+                    local targetPlayer = Players:FindFirstChild(selectedPlayer)
+                    if targetPlayer then
+                        local args = {targetPlayer}
+                        local remote = ReplicatedStorage:WaitForChild("Communication"):WaitForChild("Events"):WaitForChild("KillEvent") -- Replace "KillEvent" with actual RemoteEvent name
+                        remote:FireServer(unpack(args))
+                    end
+                    task.wait(0.5)
+                end
+            end)
+        end
+    end
+})
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = Players.LocalPlayer
+
+-- === Walk Speed Variables ===
+local speedValue = 16
+local speedEnabled = false
+
+-- Walk Speed Slider
+local SpeedSlider = Tab:CreateSlider({
+    Name = "Walk Speed",
+    Range = {16, 500},
+    Increment = 1,
+    Suffix = "Speed",
+    CurrentValue = 16,
+    Flag = "SpeedSlider",
+    Callback = function(Value)
+        speedValue = Value
+        if speedEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            LocalPlayer.Character.Humanoid.WalkSpeed = speedValue
+        end
+    end,
+})
+
+-- Walk Speed Toggle
+local SpeedToggle = Tab:CreateToggle({
+    Name = "Enable Speed",
+    CurrentValue = false,
+    Flag = "SpeedToggle",
+    Callback = function(State)
+        speedEnabled = State
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            if State then
+                LocalPlayer.Character.Humanoid.WalkSpeed = speedValue
+            else
+                LocalPlayer.Character.Humanoid.WalkSpeed = 16 -- reset
+            end
+        end
+    end,
+})
+
+-- Auto apply on respawn
+LocalPlayer.CharacterAdded:Connect(function(char)
+    local humanoid = char:WaitForChild("Humanoid")
+    if speedEnabled then
+        humanoid.WalkSpeed = speedValue
+    end
+end)
+
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- Dropdown options
+local chatOptions = {"1", "2", "3"}
+local selectedChat = chatOptions[1] -- default selection
+local autoChatEnabled = false
+
+-- Dropdown for chat number
+local ChatDropdown = Tab:CreateDropdown({
+    Name = "Select Number",
+    Options = chatOptions,
+    Flag = "ChatDropdown",
+    Callback = function(choice)
+        selectedChat = choice
+    end
+})
+
+-- Auto Chat Toggle
+Tab:CreateToggle({
+    Name = "Auto Chat",
+    CurrentValue = false,
+    Flag = "AutoChatToggle",
+    Callback = function(state)
+        autoChatEnabled = state
+        if autoChatEnabled then
+            spawn(function()
+                while autoChatEnabled do
+                    local args = {tonumber(selectedChat)}
+                    local remote = ReplicatedStorage:WaitForChild("Communication"):WaitForChild("Events"):WaitForChild("ChatEvent") -- Replace "ChatEvent" with your RemoteEvent name
+                    remote:FireServer(unpack(args))
+                    task.wait(1) -- delay between messages
+                end
+            end)
+        end
+    end
+})
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+
+local autoBlameEnabled = false
+local targetPlayerName = "" -- Text input
+
+-- Input box for player name
+local Input = Tab:CreateInput({
+   Name = "Player to Target",
+   CurrentValue = "",
+   PlaceholderText = "Type username or nickname",
+   RemoveTextAfterFocusLost = false,
+   Flag = "TargetInput",
+   Callback = function(Text)
+       targetPlayerName = Text
+   end,
+})
+
+-- Auto Blame toggle
+Tab:CreateToggle({
+    Name = "Auto Fire",
+    CurrentValue = false,
+    Flag = "AutoFireToggle",
+    Callback = function(state)
+        autoBlameEnabled = state
+        if autoBlameEnabled then
+            spawn(function()
+                while autoBlameEnabled do
+                    if targetPlayerName and targetPlayerName ~= "" then
+                        local targetPlayer = nil
+                        for _, p in pairs(Players:GetPlayers()) do
+                            if string.find(p.Name:lower(), targetPlayerName:lower()) 
+                               or string.find(p.DisplayName:lower(), targetPlayerName:lower()) then
+                                targetPlayer = p
+                                break
+                            end
+                        end
+
+                        if targetPlayer then
+                            local args = {targetPlayer}
+                            local remote = ReplicatedStorage:WaitForChild("Communication"):WaitForChild("Events"):WaitForChild("BlameEvent") -- Replace "BlameEvent" with actual RemoteEvent name
+                            remote:FireServer(unpack(args))
+                        end
+                    end
+                    task.wait(0.5) -- loop delay
+                end
+            end)
+        end
+    end
+})
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = Players.LocalPlayer
+
+-- Create a new tab for Role Switching
+local RoleTab = Window:CreateTab("Role Changer", 4483362458)
+
+-- List of roles (replace/add your game's actual roles)
+local roles = {"Mafia", "Doctor", "Civilian", "Detective", "Jester", "Sheriff"}
+local selectedRole = roles[1]
+local autoBecomeEnabled = false
+
+-- Dropdown to select a role
+local RoleDropdown = RoleTab:CreateDropdown({
+    Name = "Select Role",
+    Options = roles,
+    Flag = "RoleDropdown",
+    Callback = function(choice)
+        selectedRole = choice
+    end
+})
+
+-- Auto Become toggle
+RoleTab:CreateToggle({
+    Name = "Auto Become Role",
+    CurrentValue = false,
+    Flag = "AutoBecomeToggle",
+    Callback = function(state)
+        autoBecomeEnabled = state
+        if autoBecomeEnabled then
+            spawn(function()
+                while autoBecomeEnabled do
+                    -- Fire your role-change remote
+                    local remote = ReplicatedStorage:WaitForChild("Communication"):WaitForChild("Events"):WaitForChild("TeamChange") -- Replace "TeamChange" with your RemoteEvent
+                    if remote then
+                        remote:FireServer(selectedRole)
+                    end
+                    task.wait(1) -- Delay to avoid spamming
+                end
+            end)
+        end
+    end
+})
