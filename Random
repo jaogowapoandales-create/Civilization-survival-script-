@@ -1,0 +1,114 @@
+-- Load Rayfield
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+-- Window
+local Window = Rayfield:CreateWindow({
+   Name = "Food Hub",
+   LoadingTitle = "Rayfield UI",
+   LoadingSubtitle = "Pump + Collect",
+   ConfigurationSaving = {
+      Enabled = true,
+      FolderName = "FoodHub",
+      FileName = "Config"
+   },
+   KeySystem = false
+})
+
+-- Tab
+local Main = Window:CreateTab("Main", 4483362458)
+
+-- Vars
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local GameplayEvents = ReplicatedStorage:WaitForChild("Events"):WaitForChild("Gameplay")
+
+local ClaimEvent = GameplayEvents:WaitForChild("ClaimFood")
+local PumpEvent = GameplayEvents:WaitForChild("ClickFoodPump")
+local PlotsFolder = workspace:WaitForChild("Gameplay"):WaitForChild("Plots")
+
+-- States
+local SelectedKG = "1kg"
+local AutoCollect = false
+local AutoPump = false
+
+-- Dropdown: KG List
+Main:CreateDropdown({
+    Name = "Select KG",
+    Options = {"1kg", "2kg", "5kg", "10kg", "25kg", "50kg", "100kg"},
+    CurrentOption = "1kg",
+    Flag = "KGDropdown",
+    Callback = function(Option)
+        SelectedKG = Option
+    end,
+})
+
+-- Toggle: Auto Collect Food
+Main:CreateToggle({
+    Name = "Auto Collect Food",
+    CurrentValue = false,
+    Flag = "AutoCollect",
+    Callback = function(Value)
+        AutoCollect = Value
+        if not Value then return end
+
+        task.spawn(function()
+            while AutoCollect do
+                if SelectedKG then
+                    local args = {"Food Pump", SelectedKG}
+                    ClaimEvent:InvokeServer(unpack(args))
+                end
+                task.wait(0.5)
+            end
+        end)
+    end,
+})
+
+-- Toggle: Auto Pump (cycles plots)
+Main:CreateToggle({
+    Name = "Auto Pump (All Plots)",
+    CurrentValue = false,
+    Flag = "AutoPump",
+    Callback = function(Value)
+        AutoPump = Value
+        if not Value then return end
+
+        task.spawn(function()
+            while AutoPump do
+                for _, plot in ipairs(PlotsFolder:GetChildren()) do
+                    if not AutoPump then break end
+                    local args = {plot}
+                    PumpEvent:FireServer(unpack(args))
+                    task.wait(0.01)
+                end
+            end
+        end)
+    end,
+})
+
+-- Vars
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local GameplayEvents = ReplicatedStorage:WaitForChild("Events"):WaitForChild("Gameplay")
+local LevelupEvent = GameplayEvents:WaitForChild("LevelupBuilding")
+
+local AutoLevelPump = false
+
+-- Toggle: Auto Level Pump
+Main:CreateToggle({
+    Name = "Auto Level Pump",
+    CurrentValue = false,
+    Flag = "AutoLevelPump",
+    Callback = function(Value)
+        AutoLevelPump = Value
+        if not Value then return end
+
+        task.spawn(function()
+            while AutoLevelPump do
+                local args = {
+                    "Food Pump", -- building name
+                    1            -- level increment (always 1)
+                }
+                LevelupEvent:FireServer(unpack(args))
+                task.wait(1) -- adjust speed
+            end
+        end)
+    end,
+})
