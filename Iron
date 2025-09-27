@@ -1,0 +1,487 @@
+-- Load Rayfield UI
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+
+-- Window
+local Window = Rayfield:CreateWindow({
+    Name = "Iron Man Hub",
+    LoadingTitle = "Universal Auto Kill",
+    LoadingSubtitle = "BulletHit Edition",
+})
+
+-- Tab
+local Main = Window:CreateTab("Main")
+
+-- Vars
+local AutoKillAll = false
+local AutoKillTargets = false
+local SelectedPlayers = {nil, nil, nil} -- for 3 dropdowns
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- Remote
+local IronManAssets = ReplicatedStorage:WaitForChild("Assets"):WaitForChild("Characters"):WaitForChild("IronMan")
+local WeaponRemote = IronManAssets:WaitForChild("Events"):WaitForChild("Weapon")
+
+------------------------------------------------
+-- Utility: Refresh player list
+------------------------------------------------
+local Dropdowns = {}
+
+local function RefreshPlayerList()
+    local options = {}
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer then
+            table.insert(options, plr.Name)
+        end
+    end
+    for _, dd in ipairs(Dropdowns) do
+        dd:Refresh(options, false) -- false = keep current option
+    end
+end
+
+------------------------------------------------
+-- 1. Auto Kill All Toggle
+------------------------------------------------
+Main:CreateToggle({
+    Name = "Auto Kill All Players (BulletHit)",
+    CurrentValue = false,
+    Flag = "AutoKillAllBullet",
+    Callback = function(Value)
+        AutoKillAll = Value
+        if Value then
+            task.spawn(function()
+                while AutoKillAll do
+                    for _, plr in ipairs(Players:GetPlayers()) do
+                        if not AutoKillAll then break end
+                        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                            local hrp = plr.Character.HumanoidRootPart
+                            local args = {
+                                "BulletHit",
+                                "Center",
+                                hrp,
+                                hrp.Position
+                            }
+                            pcall(function()
+                                WeaponRemote:FireServer(unpack(args))
+                            end)
+                        end
+                    end
+                    task.wait(0.15)
+                end
+            end)
+        end
+    end,
+})
+
+------------------------------------------------
+-- 2. Multiple Dropdowns
+------------------------------------------------
+for i = 1, 3 do -- make 3 dropdowns (Dropdown 1, 2, 3)
+    local dd = Main:CreateDropdown({
+        Name = "Select Player #" .. i,
+        Options = {},
+        CurrentOption = "",
+        Flag = "TargetPlayer" .. i,
+        Callback = function(Option)
+            SelectedPlayers[i] = Option
+        end,
+    })
+    table.insert(Dropdowns, dd)
+end
+
+-- Refresh player list initially & on player changes
+RefreshPlayerList()
+Players.PlayerAdded:Connect(RefreshPlayerList)
+Players.PlayerRemoving:Connect(function(plr)
+    if table.find(SelectedPlayers, plr.Name) then
+        for i, v in ipairs(SelectedPlayers) do
+            if v == plr.Name then
+                SelectedPlayers[i] = nil
+            end
+        end
+    end
+    RefreshPlayerList()
+end)
+
+------------------------------------------------
+-- 3. Auto Kill Selected Players Toggle
+------------------------------------------------
+Main:CreateToggle({
+    Name = "Auto Kill Selected Players",
+    CurrentValue = false,
+    Flag = "AutoKillSelected",
+    Callback = function(Value)
+        AutoKillTargets = Value
+        if Value then
+            task.spawn(function()
+                while AutoKillTargets do
+                    for _, name in ipairs(SelectedPlayers) do
+                        if not AutoKillTargets then break end
+                        if name then
+                            local plr = Players:FindFirstChild(name)
+                            if plr and plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                                local hrp = plr.Character.HumanoidRootPart
+                                local args = {
+                                    "BulletHit",
+                                    "Center",
+                                    hrp,
+                                    hrp.Position
+                                }
+                                pcall(function()
+                                    WeaponRemote:FireServer(unpack(args))
+                                end)
+                            end
+                        end
+                    end
+                    task.wait(0.15)
+                end
+            end)
+        end
+    end,
+})
+
+local LagToggle = false
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HitObject = ReplicatedStorage:WaitForChild("Assets"):WaitForChild("Core"):WaitForChild("Events"):WaitForChild("HitObject")
+
+Main:CreateToggle({
+    Name = "Lag Server (Spam FireServer)",
+    CurrentValue = false,
+    Flag = "LagToggle",
+    Callback = function(Value)
+        LagToggle = Value
+        if Value then
+            task.spawn(function()
+                while LagToggle do
+                    local args = {
+                        Vector3.new(-2114.959228515625, 462.78570556640625, 2077.13134765625),
+                        Vector3.new(-2114.959228515625, -537.2142944335938, 2077.13134765625),
+                        workspace:WaitForChild("Game"):WaitForChild("Sokovia"):WaitForChild("Rooftops"):WaitForChild("Rooftop"),
+                        false,
+                        "Mark 43"
+                    }
+                    pcall(function()
+                        HitObject:FireServer(unpack(args))
+                    end)
+                    task.wait() -- lower = more lag, remove for max spam
+                end
+            end)
+        end
+    end,
+})
+
+-- New Tab
+local Flight = Window:CreateTab("Flight")
+
+-- Vars
+local AutoBoost = false
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local BoostRemote = ReplicatedStorage:WaitForChild("Assets"):WaitForChild("Characters"):WaitForChild("IronMan"):WaitForChild("Events"):WaitForChild("Flight")
+
+-- Toggle
+Flight:CreateToggle({
+    Name = "Auto Boost",
+    CurrentValue = false,
+    Flag = "AutoBoost",
+    Callback = function(Value)
+        AutoBoost = Value
+        if Value then
+            task.spawn(function()
+                while AutoBoost do
+                    local args = {"Boost"}
+                    pcall(function()
+                        BoostRemote:FireServer(unpack(args))
+                    end)
+                    task.wait(0.1) -- spam rate (lower = faster)
+                end
+            end)
+        end
+    end,
+})
+
+-- Nuke (client-only) — paste into your existing Rayfield LocalScript (Window must exist)
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local HumRoot = Character:WaitForChild("HumanoidRootPart")
+
+-- Settings
+local PocketEnabled = false
+local NukeCooldown = 1.5
+local NukeFallTime = 1.2
+local ExplosionRadius = 40
+local CameraShakeAmount = 2.5
+local CameraShakeDuration = 0.7
+
+-- Helper
+local function v3(x,y,z) return Vector3.new(x,y,z) end
+
+-- Pocket GUI
+local pocketGui = Instance.new("ScreenGui")
+pocketGui.Name = "NukePocketGui"
+pocketGui.ResetOnSpawn = false
+pocketGui.Parent = PlayerGui
+
+local pocketFrame = Instance.new("Frame")
+pocketFrame.Name = "PocketFrame"
+pocketFrame.AnchorPoint = Vector2.new(1,1)
+pocketFrame.Position = UDim2.new(1,-24,1,-120)
+pocketFrame.Size = UDim2.new(0,64,0,64)
+pocketFrame.BackgroundTransparency = 1
+pocketFrame.Parent = pocketGui
+
+local nukeButton = Instance.new("ImageButton")
+nukeButton.Name = "NukeButton"
+nukeButton.Size = UDim2.new(0,64,0,64)
+nukeButton.Position = UDim2.new(0,0,0,0)
+nukeButton.AnchorPoint = Vector2.new(0.5,0.5)
+nukeButton.BackgroundTransparency = 0.4
+nukeButton.BackgroundColor3 = Color3.fromRGB(20,20,20)
+nukeButton.Image = "" -- optional image
+nukeButton.Parent = pocketFrame
+
+local label = Instance.new("TextLabel")
+label.Size = UDim2.new(1,0,0,18)
+label.Position = UDim2.new(0,0,0,-18)
+label.BackgroundTransparency = 1
+label.Text = "NUKE"
+label.TextScaled = true
+label.TextColor3 = Color3.new(1,0.4,0.4)
+label.Font = Enum.Font.SourceSansBold
+label.Parent = pocketFrame
+
+pocketGui.Enabled = false
+
+-- Cooldown guard
+local lastLaunch = -999
+
+-- Camera shake
+local function shakeCamera(duration, magnitude)
+    local cam = workspace.CurrentCamera
+    local start = tick()
+    local origCFrame = cam.CFrame
+    local heartbeatConn
+    heartbeatConn = RunService.Heartbeat:Connect(function()
+        local now = tick()
+        local t = now - start
+        if t > duration then
+            heartbeatConn:Disconnect()
+            cam.CFrame = origCFrame
+            return
+        end
+        local factor = (1 - (t/duration))
+        local offset = Vector3.new(
+            (math.noise(now*15)*2-1) * magnitude * factor * 0.1,
+            (math.noise(now*15+100)*2-1) * magnitude * factor * 0.1,
+            (math.noise(now*15+200)*2-1) * magnitude * factor * 0.1
+        )
+        cam.CFrame = origCFrame * CFrame.new(offset)
+    end)
+end
+
+-- Flash effect
+local function flashScreen(strength, duration)
+    local flash = Instance.new("Frame")
+    flash.Size = UDim2.new(1,0,1,0)
+    flash.Position = UDim2.new(0,0,0,0)
+    flash.BackgroundColor3 = Color3.new(1,1,1)
+    flash.BackgroundTransparency = 1 - (strength or 1)
+    flash.ZIndex = 9999
+    flash.Parent = PlayerGui
+    local tween = TweenService:Create(flash, TweenInfo.new(duration, Enum.EasingStyle.Quad), {BackgroundTransparency = 1})
+    tween:Play()
+    tween.Completed:Connect(function() flash:Destroy() end)
+end
+
+-- Explosion visuals
+local function playExplosionAt(pos)
+    local sphere = Instance.new("Part")
+    sphere.Anchored = true
+    sphere.CanCollide = false
+    sphere.Size = Vector3.new(1,1,1)
+    sphere.CFrame = CFrame.new(pos)
+    sphere.Material = Enum.Material.Neon
+    sphere.Shape = Enum.PartType.Ball
+    sphere.Transparency = 0.25
+    sphere.Parent = workspace
+    local targetSize = ExplosionRadius*2
+
+    local emitter = Instance.new("ParticleEmitter")
+    emitter.Texture = "rbxassetid://243660364"
+    emitter.Rate = 0
+    emitter.Lifetime = NumberRange.new(0.8,1.6)
+    emitter.Speed = NumberRange.new(30,60)
+    emitter.RotSpeed = NumberRange.new(-180,180)
+    emitter.EmissionDirection = Enum.NormalId.Top
+    emitter.Parent = sphere
+    emitter:Emit(80)
+
+    local expandTween = TweenService:Create(sphere, TweenInfo.new(0.9, Enum.EasingStyle.Exponential), {Size = Vector3.new(targetSize,targetSize,targetSize), Transparency = 1})
+    expandTween:Play()
+    expandTween.Completed:Connect(function() sphere:Destroy() end)
+
+    local dust = Instance.new("ParticleEmitter")
+    dust.Texture = "rbxassetid://258128463"
+    dust.Rate = 0
+    dust.Lifetime = NumberRange.new(0.6,1)
+    dust.Speed = NumberRange.new(20,40)
+    dust.Size = NumberSequence.new({NumberSequenceKeypoint.new(0,3), NumberSequenceKeypoint.new(1,0.5)})
+    dust.EmissionDirection = Enum.NormalId.Front
+    dust.Parent = sphere
+    dust:Emit(120)
+
+    local sound = Instance.new("Sound")
+    sound.SoundId = "rbxassetid://138186576"
+    sound.Volume = 1.5
+    sound.Parent = sphere
+    sound:Play()
+
+    flashScreen(0.9,0.35)
+    shakeCamera(CameraShakeDuration,CameraShakeAmount)
+end
+
+-- Launch nuke (with damage)
+local function launchNuke(targetPos)
+    if tick() - lastLaunch < NukeCooldown then return end
+    lastLaunch = tick()
+
+    local spawnHeight = 200
+    local nukePart = Instance.new("Part")
+    nukePart.Size = Vector3.new(4,6,4)
+    nukePart.Shape = Enum.PartType.Block
+    nukePart.Anchored = true
+    nukePart.CanCollide = false
+    nukePart.Material = Enum.Material.Metal
+    nukePart.Color = Color3.fromRGB(50,50,50)
+    nukePart.CFrame = CFrame.new(targetPos + Vector3.new(0, spawnHeight, 0))
+    nukePart.Parent = workspace
+    nukePart.Name = "LocalNuke"
+
+    local trail = Instance.new("ParticleEmitter")
+    trail.Texture = "rbxassetid://241594314"
+    trail.Rate = 200
+    trail.Lifetime = NumberRange.new(0.2,0.6)
+    trail.Speed = NumberRange.new(0,0)
+    trail.VelocitySpread = 30
+    trail.Parent = nukePart
+
+    -- Cinematic camera
+    local cam = workspace.CurrentCamera
+    local origCFrame = cam.CFrame
+    cam.CFrame = CFrame.new(nukePart.Position + Vector3.new(0,30,50), nukePart.Position)
+
+    local targetCFrame = CFrame.new(targetPos + Vector3.new(0,3,0)) * CFrame.Angles(0, math.rad(360), 0)
+    local fallTween = TweenService:Create(nukePart, TweenInfo.new(NukeFallTime, Enum.EasingStyle.Linear), {CFrame = targetCFrame})
+    fallTween:Play()
+
+    local beep = Instance.new("Sound", nukePart)
+    beep.SoundId = "rbxassetid://911882021"
+    beep.Looped = true
+    beep.Volume = 0.8
+    beep:Play()
+
+    fallTween.Completed:Connect(function()
+        if beep.Playing then beep:Stop() end
+        trail.Enabled = false
+        playExplosionAt(targetPos + Vector3.new(0,1,0))
+
+        -- Damage players in radius (example: IronMan server event)
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("UpperTorso") then
+                local distance = (player.Character.UpperTorso.Position - targetPos).Magnitude
+                if distance <= ExplosionRadius then
+                    local args = {
+                        "BulletHit",
+                        "Center",
+                        player.Character.UpperTorso
+                    }
+                    local weaponEvent = ReplicatedStorage:WaitForChild("Assets"):WaitForChild("Characters"):WaitForChild("IronMan"):WaitForChild("Events"):WaitForChild("Weapon")
+                    weaponEvent:FireServer(unpack(args))
+                end
+            end
+        end
+
+        nukePart:Destroy()
+        cam.CFrame = origCFrame
+    end)
+end
+
+-- Pocket button animation
+local function playPocketPress()
+    local origSize = nukeButton.Size
+    local shrink = TweenService:Create(nukeButton, TweenInfo.new(0.08, Enum.EasingStyle.Quad), {Size = UDim2.new(0,48,0,48)})
+    local back = TweenService:Create(nukeButton, TweenInfo.new(0.12, Enum.EasingStyle.Back), {Size = origSize})
+    shrink:Play()
+    shrink.Completed:Connect(function() back:Play() end)
+end
+
+-- Mouse target
+local function getMouseTargetPoint()
+    local mouse = LocalPlayer:GetMouse()
+    local target = mouse.Hit
+    if target then return target.p end
+    return HumRoot.Position + HumRoot.CFrame.LookVector*60 - Vector3.new(0, HumRoot.Position.Y - workspace.FallenPartsDestroyHeight, 0)
+end
+
+-- Pocket button click
+nukeButton.MouseButton1Click:Connect(function()
+    playPocketPress()
+    local target = getMouseTargetPoint()
+    launchNuke(target)
+end)
+
+-- Rayfield Nuke tab + toggle
+local NukeTab = Window:CreateTab("Nuke")
+NukeTab:CreateToggle({
+    Name = "Enable Nuke Pocket (Client-Only)",
+    CurrentValue = false,
+    Flag = "EnableNukePocket",
+    Callback = function(val)
+        PocketEnabled = val
+        pocketGui.Enabled = val
+        if val then
+            local notice = Instance.new("TextLabel")
+            notice.Size = UDim2.new(0.3,0,0,36)
+            notice.Position = UDim2.new(1,-260,1,-170)
+            notice.Text = "Nuke pocket enabled! Click button or press N."
+            notice.TextScaled = true
+            notice.BackgroundTransparency = 0.5
+            notice.TextColor3 = Color3.new(1,1,1)
+            notice.Parent = pocketGui
+            task.spawn(function() wait(2.5) notice:Destroy() end)
+        end
+    end
+})
+
+-- Hotkey "N"
+local mouse = LocalPlayer:GetMouse()
+mouse.KeyDown:Connect(function(key)
+    if key:lower() == "n" and pocketGui.Enabled then
+        playPocketPress()
+        local target = getMouseTargetPoint()
+        launchNuke(target)
+    end
+end)
+
+-- Rebind HumRoot on respawn
+LocalPlayer.CharacterAdded:Connect(function(char)
+    Character = char
+    HumRoot = char:WaitForChild("HumanoidRootPart")
+end)
+
+-- Create teleport button in the existing Nuke tab
+NukeTab:CreateButton({
+    Name = "TP to Space",
+    Callback = function()
+        local targetPos = Vector3.new(-4565.0205078125, 9307.3486328125, 2408.883544921875)
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(targetPos)
+        end
+    end
+})
