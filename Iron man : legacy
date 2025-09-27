@@ -1,0 +1,58 @@
+-- Load Rayfield UI
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+
+-- Create Main Window
+local Window = Rayfield:CreateWindow({
+    Name = "Iron Man Hub",
+    LoadingTitle = "Kill All",
+    LoadingSubtitle = "Repulsor Edition",
+})
+
+-- Create Tab
+local Main = Window:CreateTab("Main")
+
+-- Vars
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = Players.LocalPlayer
+local RepulsorRemote = ReplicatedStorage:WaitForChild("Events"):WaitForChild("repulsorHit")
+
+local KillAllEnabled = false
+
+-- Function to hit a target player
+local function hitPlayer(targetPlayer)
+    if targetPlayer and targetPlayer ~= LocalPlayer and targetPlayer.Character then
+        local targetChar = targetPlayer.Character
+        local hair = targetChar:FindFirstChild("Pal Hair")
+        if hair and hair:FindFirstChild("Handle") then
+            local args = {
+                "LeftHand",
+                hair.Handle,
+                Vector3.new(-177.23500061035156, 467.4400634765625, -16.474395751953125),
+                Vector3.new(-0.17879657447338104, -0.2483951449394226, 0.9520148038864136),
+                targetChar
+            }
+            RepulsorRemote:FireServer(unpack(args))
+        end
+    end
+end
+
+-- Create Toggle for Kill All
+Main:CreateToggle({
+    Name = "Kill All Players",
+    CurrentValue = false,
+    Flag = "KillAllToggle",
+    Callback = function(val)
+        KillAllEnabled = val
+        if KillAllEnabled then
+            task.spawn(function()
+                while KillAllEnabled do
+                    for _, player in pairs(Players:GetPlayers()) do
+                        hitPlayer(player)
+                    end
+                    task.wait(0.01) -- delay between waves
+                end
+            end)
+        end
+    end,
+})
